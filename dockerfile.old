@@ -1,0 +1,158 @@
+# Allow passing in your host UID/GID (defaults 1000:1000)
+ARG UID=1000
+ARG GID=1000
+#webgui service port
+ARG PORT=8188
+ARG COMFYARG=""
+# Start your image with a node base image
+# FROM nvidia/cuda:12.1.1-base-ubuntu22.04
+# FROM nvidia/cuda:12.6.3-base-ubuntu24.04
+FROM nvidia/cuda:12.4.0-base-ubuntu22.04
+
+ARG PORT
+ENV docker_PORT=$PORT
+ENV docker_COMFYARG=$COMFYARG
+
+##### Base
+# Install system packages
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -y --fix-missing\
+  && apt-get install -y \
+    apt-utils \
+    locales \
+    ca-certificates \
+    && apt-get upgrade -y \
+    && apt-get clean
+
+ARG PORT
+
+
+# UTF-8
+RUN localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG=en_US.utf8
+ENV LC_ALL=C
+
+# Install needed packages
+RUN apt-get update -y  --fix-missing \
+  && apt-get upgrade -y \
+  && apt-get install -y \
+    build-essential \
+    python3-dev \
+        python3-venv \
+    unzip \
+    wget \
+    zip \
+    zlib1g \
+    zlib1g-dev \
+    gnupg \
+    rsync \
+    python3-pip \
+    python3-venv \
+    git \
+    sudo \
+    libglib2.0-0 \
+    socat \
+  && apt-get clean
+
+ARG PORT
+
+
+# Add libEGL ICD loaders and libraries + Vulkan ICD loaders and libraries
+# Per https://github.com/mmartial/ComfyUI-Nvidia-Docker/issues/26
+RUN apt install -y libglvnd0 libglvnd-dev libegl1-mesa-dev libvulkan1 libvulkan-dev ffmpeg libgl1-mesa-glx libglib2.0-0 \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /usr/share/glvnd/egl_vendor.d \
+  && echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}' > /usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+  && mkdir -p /usr/share/vulkan/icd.d \
+  && echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libGLX_nvidia.so.0","api_version":"1.3"}}' > /usr/share/vulkan/icd.d/nvidia_icd.json
+
+ENV MESA_D3D12_DEFAULT_ADAPTER_NAME="NVIDIA"
+
+# Install OS deps and create the non-root user
+# RUN apt-get update \
+# && apt-get install -y --no-install-recommends git \
+# && groupadd --gid ${GID} appuser \
+# && useradd --uid ${UID} --gid ${GID} --create-home --shell /bin/bash appuser \
+# && rm -rf /var/lib/apt/lists/*
+
+ARG UID
+ARG GID
+ARG PORT
+
+RUN groupadd --gid ${GID} appuser
+RUN useradd --uid ${UID} --gid ${GID} --create-home --shell /bin/bash appuser
+RUN rm -rf /var/lib/apt/lists/*
+
+# Install Mesa/GL and GLib so OpenCV can load libGL.so.1 for ComfyUI-VideoHelperSuite
+# Install python3-pip
+# RUN apt-get update \
+# && apt-get install -y --no-install-recommends \
+#      libgl1-mesa-glx \
+#      libglib2.0-0 \
+#         python3-pip \
+#         python3.4 \
+#         python-is-python3 \
+# && rm -rf /var/lib/apt/lists/*
+
+# Copy and enable the startup script
+ARG PORT
+COPY entrypoint.sh /entrypoint.sh
+
+# Fix Windows CRLF -> Unix LF
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
+# Switch to non-root user
+ARG PORT
+USER $UID:$GID
+
+# make ~/.local/bin available on the PATH so scripts like tqdm, torchrun, etc. are found
+ARG PORT
+ENV PATH=/home/appuser/.local/bin:$PATH
+
+# Set the working directory
+ARG PORT
+WORKDIR /app
+
+# Clone the ComfyUI repository (replace URL with the official repo)
+ARG PORT
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git --branch v0.3.57
+
+# Change directory to the ComfyUI folder
+ARG PORT
+WORKDIR /app/ComfyUI
+
+# create python venv
+ARG PORT
+RUN python3 -m venv .venv --prompt "ComfyUI"
+# add it to path
+ENV PATH="/app/ComfyUI/.venv/bin:$PATH"
+
+# install torch
+# RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu121
+# install requirements
+
+# Install ComfyUI dependencies
+ARG PORT
+# install a version of pytorch suitable for 10xx nvidia family
+RUN pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu118
+RUN pip install  --no-cache-dir -r requirements.txt
+
+# (Optional) Clean up pip cache to reduce image size
+RUN pip cache purge
+
+ARG PORT
+# Expose the port that ComfyUI will use (change if needed)
+EXPOSE $PORT
+
+# Run entrypoint first, then start ComfyUI
+# Install the default packages (we only want ComfyUI Manager to keep the images small).
+ENTRYPOINT ["/entrypoint.sh"]
+
+ARG PORT
+CMD python /app/ComfyUI/main.py --listen 0.0.0.0 --port ${docker_PORT} ${docker_COMFYARG}
+
+
+
