@@ -101,8 +101,6 @@ COPY entrypoint.sh /entrypoint.sh
 # Fix Windows CRLF -> Unix LF
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-RUN chmod +x /entrypoint.sh
-
 # Switch to non-root user
 ARG PORT
 USER $UID:$GID
@@ -138,6 +136,17 @@ ARG PORT
 # install a version of pytorch suitable for 10xx nvidia family
 RUN pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu118
 RUN pip install  --no-cache-dir -r requirements.txt
+
+# Extra Python deps for bundled custom nodes & ComfyUI-Manager
+RUN pip install --no-cache-dir \
+    deepdiff \
+    opencv-python-headless \
+    toml \
+    GitPython \
+    PyGithub \
+    matrix-nio \
+    uv
+
 
 # (Optional) Clean up pip cache to reduce image size
 RUN pip cache purge

@@ -37,7 +37,7 @@ if [ ! -f "$INIT_MARKER" ]; then
     req="$dir/requirements.txt"
     if [ -f "$req" ]; then
       echo "  ↳ pip install --upgrade -r $req"
-      pip install --no-cache-dir --upgrade -r "$req"
+      pip install --no-cache-dir --no-deps --upgrade -r "$req"
     fi
   done
 
