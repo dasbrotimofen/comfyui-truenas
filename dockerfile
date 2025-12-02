@@ -1,6 +1,6 @@
 # Allow passing in your host UID/GID (defaults 1000:1000)
-ARG UID=1000
-ARG GID=1000
+ARG UID=568
+ARG GID=568
 #webgui service port
 ARG PORT=8188
 ARG COMFYARG=""
