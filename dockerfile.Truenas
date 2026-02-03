@@ -1,0 +1,24 @@
+name: comfyui-docker
+services:
+  comfyui:
+    image: ghcr.io/lecode-official/comfyui-docker:${IMAGE_TAG:-latest}
+    container_name: comfyui
+    restart: unless-stopped
+    environment:
+      - UID=1000
+      - GID=1000
+    ports:
+      - "8188:8188"
+    privileged: True
+    volumes:
+      - "/mnt/MEGA-Storage/Docker-tests/comfyui/models:/opt/comfyui/models:rw"
+      - "/mnt/MEGA-Storage/Docker-tests/comfyui/custom-nodes:/opt/comfyui/custom_nodes:rw"
+      - "/mnt/MEGA-Storage/Docker-tests/comfyui/comfyui-manager:/opt/comfyui/custom_nodes/ComfyUI-Manager:rw"
+      - "/mnt/MEGA-Storage/Docker-tests/comfyui/output:/opt/comfyui/output:rw"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
